@@ -3,21 +3,14 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-from plotly.subplots import make_subplots
 import spacy
-from textblob import TextBlob
 import textstat
 from collections import Counter
 import re
-from langdetect import detect, DetectorFactory
-from googletrans import Translator
 import nltk
 from nltk.tokenize import sent_tokenize
 import warnings
 warnings.filterwarnings('ignore')
-
-# Initialize for consistent language detection
-DetectorFactory.seed = 42
 
 # ---------------------------
 # PAGE CONFIG
@@ -162,36 +155,40 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------
-# LOAD MODELS
+# LOAD MODELS WITH ERROR HANDLING
 # ---------------------------
 @st.cache_resource
 def load_spacy():
+    """Load spaCy model with proper error handling"""
     try:
         return spacy.load("en_core_web_sm")
-    except:
-        st.warning("⚠️ Installing spaCy model... Please wait.")
-        spacy.cli.download("en_core_web_sm")
-        return spacy.load("en_core_web_sm")
+    except OSError:
+        st.error("""
+        ❌ spaCy model 'en_core_web_sm' not found. 
+        Please install it using: python -m spacy download en_core_web_sm
+        """)
+        st.stop()
 
 @st.cache_resource
 def load_nltk():
+    """Load NLTK data with proper error handling"""
     try:
         nltk.data.find("tokenizers/punkt")
     except LookupError:
-        nltk.download("punkt")
+        nltk.download("punkt", quiet=True)
     return True
 
+# Initialize models
 nlp = load_spacy()
 load_nltk()
-translator = Translator()
 
 # ---------------------------
-# ARGUMENT ANALYZER CLASS
+# OPTIMIZED ARGUMENT ANALYZER CLASS
 # ---------------------------
 class AdvancedArgumentAnalyzer:
     
     def __init__(self):
-        # Feature weights
+        # Feature weights (bounded)
         self.weights = {
             'evidence': 20,
             'statistics': 15,
@@ -204,95 +201,86 @@ class AdvancedArgumentAnalyzer:
         
         # Word lists
         self.evidence_words = {'research', 'study', 'data', 'evidence', 'analysis', 'findings', 
-                               'experiment', 'survey', 'statistics', 'according to', 'published',
-                               'journal', 'scientific', 'peer-reviewed', 'demonstrated', 'shown'}
+                               'experiment', 'survey', 'statistics', 'published', 'journal', 
+                               'scientific', 'demonstrated', 'shown'}
         
         self.logic_words = {'therefore', 'thus', 'hence', 'because', 'since', 'consequently',
-                           'if', 'then', 'implies', 'leads to', 'results in', 'due to',
-                           'accordingly', 'furthermore', 'moreover', 'additionally'}
+                           'if', 'then', 'implies', 'due to', 'accordingly', 'furthermore', 
+                           'moreover', 'additionally'}
         
         self.bias_words = {'always', 'never', 'everyone', 'nobody', 'all', 'none',
                           'completely', 'absolutely', 'totally', 'undoubtedly',
-                          'certainly', 'without doubt', 'impossible', 'perfect'}
+                          'certainly', 'impossible', 'perfect'}
         
         self.weak_words = {'maybe', 'perhaps', 'possibly', 'might', 'could', 'may',
-                          'somewhat', 'sort of', 'kind of', 'probably', 'seems',
-                          'appears', 'suggests', 'a little', 'a bit'}
+                          'somewhat', 'probably', 'seems', 'appears', 'suggests'}
         
         self.emotional_words = {'outrageous', 'horrible', 'amazing', 'incredible',
                                'terrible', 'awful', 'fantastic', 'unbelievable',
-                               'shocking', 'disgusting', 'wonderful', 'perfect'}
+                               'shocking', 'disgusting', 'wonderful'}
         
-        # Fallacy patterns
-        self.fallacy_patterns = {
-            'ad_hominem': r'\b(you|your|he|she|they)\s+(is|are|was|were)\s+\w+(ly|ic|ful)\b',
-            'hasty_generalization': r'\ball\s+\w+(\s+are|\s+is)?\b|\beveryone\b|\bnobody\b',
-            'slippery_slope': r'\b(lead to|result in|end with|ultimately)\b.*\b(will|would|could)\b',
-            'false_dilemma': r'\b(either|or)\b.*\b(or|otherwise)\b',
-            'appeal_to_emotion': r'\b(think of|imagine|feel|care about|concerned)\b',
-            'circular_reasoning': r'\bbecause\b.*\btherefore\b|\bso\b.*\bbecause\b'
-        }
+        # Improved fallacy detection with controlled lists
+        self.ad_hominem_insults = {'stupid', 'idiot', 'foolish', 'ignorant', 'dumb', 
+                                   'ridiculous', 'absurd', 'laughable', 'clueless'}
+        
+        self.generalization_indicators = {'all', 'every', 'none', 'no one', 'everyone', 
+                                          'nobody', 'always', 'never'}
+        
+        self.slippery_slope_phrases = {'lead to', 'result in', 'end with', 'ultimately',
+                                       'inevitably', 'certain to'}
+        
+        self.false_dilemma_phrases = {'either', 'or', 'choose between', 'only two options'}
+        
+        self.circular_patterns = [r'because.*so', r'so.*because', r'therefore.*because']
         
         # Argument role patterns
         self.role_patterns = {
-            'claim': r'\b(argue|believe|think|claim|assert|contend|maintain)\b',
-            'evidence': r'\b(according to|research shows|study found|data suggests|evidence indicates)\b',
-            'counterargument': r'\b(however|but|although|yet|nevertheless|on the other hand|conversely)\b',
-            'conclusion': r'\b(therefore|thus|hence|consequently|in conclusion|to summarize|overall)\b'
+            'claim': r'\b(argue|believe|think|claim|assert|contend|maintain|propose)\b',
+            'evidence': r'\b(according to|research shows|study found|data suggests|evidence indicates|demonstrates that)\b',
+            'counterargument': r'\b(however|but|although|yet|nevertheless|on the other hand|conversely|despite)\b',
+            'conclusion': r'\b(therefore|thus|hence|consequently|in conclusion|to summarize|overall|ultimately)\b'
         }
-    
-    def detect_language(self, text):
-        """Detect language of input text"""
-        try:
-            lang = detect(text)
-            return lang
-        except:
-            return 'en'
-    
-    def translate_to_english(self, text):
-        """Translate non-English text to English"""
-        try:
-            translated = translator.translate(text, dest='en')
-            return translated.text
-        except:
-            return text
     
     def extract_features(self, sentence):
-        """Extract linguistic features from sentence"""
+        """Extract linguistic features from sentence (optimized)"""
         doc = nlp(sentence)
+        
+        # Count occurrences efficiently
+        evidence_count = sum(1 for token in doc if token.text.lower() in self.evidence_words)
+        logic_count = sum(1 for token in doc if token.text.lower() in self.logic_words)
+        bias_count = sum(1 for token in doc if token.text.lower() in self.bias_words)
+        weak_count = sum(1 for token in doc if token.text.lower() in self.weak_words)
+        emotional_count = sum(1 for token in doc if token.text.lower() in self.emotional_words)
+        
         features = {
-            'evidence_present': any(word.text.lower() in self.evidence_words for word in doc),
+            'evidence_present': evidence_count > 0,
             'statistics_present': any(token.like_num for token in doc),
-            'logic_present': any(word.text.lower() in self.logic_words for word in doc),
-            'emotional_present': any(word.text.lower() in self.emotional_words for word in doc),
-            'bias_present': any(word.text.lower() in self.bias_words for word in doc),
-            'weak_present': any(word.text.lower() in self.weak_words for word in doc),
+            'logic_present': logic_count > 0,
+            'emotional_present': emotional_count > 0,
+            'bias_present': bias_count > 0,
+            'weak_present': weak_count > 0,
             'word_count': len([token for token in doc if not token.is_punct]),
             'has_numbers': any(token.like_num for token in doc),
-            'has_proper_nouns': any(token.pos_ == 'PROPN' for token in doc),
-            'entities': [(ent.text, ent.label_) for ent in doc.ents]
+            'evidence_count': min(evidence_count, 3),  # Cap at 3
+            'logic_count': min(logic_count, 3),
+            'bias_count': min(bias_count, 3),
+            'weak_count': min(weak_count, 3),
+            'emotional_count': min(emotional_count, 3)
         }
-        
-        # Count feature occurrences
-        features['evidence_count'] = sum(1 for word in doc if word.text.lower() in self.evidence_words)
-        features['logic_count'] = sum(1 for word in doc if word.text.lower() in self.logic_words)
-        features['bias_count'] = sum(1 for word in doc if word.text.lower() in self.bias_words)
-        features['weak_count'] = sum(1 for word in doc if word.text.lower() in self.weak_words)
-        features['emotional_count'] = sum(1 for word in doc if word.text.lower() in self.emotional_words)
         
         return features
     
     def calculate_score(self, features):
-        """Calculate weighted score for sentence"""
-        score = 50  # Base score
+        """Calculate weighted score for sentence with safe bounds"""
+        score = 50.0  # Base score
         
-        # Apply weights
+        # Apply positive weights (capped)
         if features['evidence_present']:
-            score += self.weights['evidence'] * min(features['evidence_count'], 2)
+            score += self.weights['evidence'] * (features['evidence_count'] / 2)
         if features['statistics_present']:
             score += self.weights['statistics']
         if features['logic_present']:
-            score += self.weights['logic'] * min(features['logic_count'], 2)
+            score += self.weights['logic'] * (features['logic_count'] / 2)
         
         # Ideal sentence length (10-25 words)
         word_count = features['word_count']
@@ -301,16 +289,16 @@ class AdvancedArgumentAnalyzer:
         elif word_count > 40 or word_count < 5:
             score -= 5
         
-        # Penalties
+        # Apply penalties (capped)
         if features['emotional_present']:
-            score += self.weights['emotional'] * min(features['emotional_count'], 2)
+            score += self.weights['emotional'] * (features['emotional_count'] / 2)
         if features['bias_present']:
-            score += self.weights['bias'] * min(features['bias_count'], 2)
+            score += self.weights['bias'] * (features['bias_count'] / 2)
         if features['weak_present']:
-            score += self.weights['weak'] * min(features['weak_count'], 2)
+            score += self.weights['weak'] * (features['weak_count'] / 2)
         
-        # Normalize to 0-100
-        return max(0, min(100, score))
+        # Safe bounding
+        return max(0.0, min(100.0, score))
     
     def get_category(self, score):
         """Get category based on score"""
@@ -324,15 +312,39 @@ class AdvancedArgumentAnalyzer:
             return "Weak", "🔴"
     
     def detect_fallacy(self, sentence):
-        """Detect logical fallacies in sentence"""
+        """Improved fallacy detection with lower false positives"""
         sentence_lower = sentence.lower()
+        words = set(sentence_lower.split())
         fallacies = []
         
-        for fallacy, pattern in self.fallacy_patterns.items():
-            if re.search(pattern, sentence_lower):
-                fallacies.append(fallacy.replace('_', ' ').title())
+        # Ad Hominem detection
+        if words & self.ad_hominem_insults:
+            fallacies.append("Ad Hominem")
         
-        return fallacies if fallacies else ["None Detected"]
+        # Hasty Generalization
+        if any(indicator in sentence_lower for indicator in self.generalization_indicators):
+            fallacies.append("Hasty Generalization")
+        
+        # Slippery Slope
+        if any(phrase in sentence_lower for phrase in self.slippery_slope_phrases):
+            fallacies.append("Slippery Slope")
+        
+        # False Dilemma
+        if any(phrase in sentence_lower for phrase in self.false_dilemma_phrases):
+            if 'either' in sentence_lower and 'or' in sentence_lower:
+                fallacies.append("False Dilemma")
+        
+        # Appeal to Emotion
+        if words & self.emotional_words:
+            fallacies.append("Appeal to Emotion")
+        
+        # Circular Reasoning
+        for pattern in self.circular_patterns:
+            if re.search(pattern, sentence_lower):
+                fallacies.append("Circular Reasoning")
+                break
+        
+        return list(set(fallacies)) if fallacies else ["None Detected"]
     
     def determine_argument_role(self, sentence, prev_role=None):
         """Determine the argument role of sentence"""
@@ -342,7 +354,7 @@ class AdvancedArgumentAnalyzer:
             if re.search(pattern, sentence_lower):
                 return role.title()
         
-        # Default based on position if no clear role
+        # Default based on position
         if prev_role is None:
             return "Claim"
         elif prev_role.lower() == "claim":
@@ -350,15 +362,20 @@ class AdvancedArgumentAnalyzer:
         else:
             return "Conclusion"
     
-    def get_readability_metrics(self, text):
-        """Calculate readability metrics"""
+    @st.cache_data(ttl=3600)
+    def get_readability_metrics_cached(_self, text):
+        """Cached readability metrics for full text"""
         return {
             'flesch_score': textstat.flesch_reading_ease(text),
             'avg_sentence_length': textstat.avg_sentence_length(text),
             'complex_words': textstat.difficult_words(text),
-            'complex_percentage': (textstat.difficult_words(text) / max(textstat.lexicon_count(text, True), 1)) * 100,
             'grade_level': textstat.flesch_kincaid_grade(text)
         }
+    
+    def get_sentence_readability(self, sentence):
+        """Lightweight sentence readability approximation"""
+        score = textstat.flesch_reading_ease(sentence)
+        return score
     
     def get_readability_level(self, score):
         """Determine readability level"""
@@ -370,33 +387,45 @@ class AdvancedArgumentAnalyzer:
             return "Complex"
     
     def generate_rewrite(self, sentence, features):
-        """Generate improved versions of sentence"""
+        """Improved rewrite function with grammar preservation"""
         original = sentence
         
-        # Stronger version
+        # Stronger version (remove weak words)
         stronger = sentence
         if features['weak_present']:
-            for word in self.weak_words:
-                if word in sentence.lower():
-                    stronger = re.sub(rf'\b{word}\b', '', stronger, flags=re.IGNORECASE)
+            words = sentence.split()
+            filtered_words = []
+            for word in words:
+                clean_word = re.sub(r'[^\w]', '', word.lower())
+                if clean_word not in self.weak_words:
+                    filtered_words.append(word)
+            stronger = ' '.join(filtered_words)
+            if not stronger.strip():
+                stronger = sentence
         
         # Evidence-based version
         evidence_based = sentence
-        if not features['evidence_present']:
-            evidence_based = "According to research, " + sentence[0].lower() + sentence[1:]
+        if not features['evidence_present'] and len(sentence.split()) > 3:
+            evidence_based = f"According to research, {sentence[0].lower()}{sentence[1:]}"
         
-        # Neutral version
+        # Neutral version (remove bias and emotional words)
         neutral = sentence
         if features['emotional_present'] or features['bias_present']:
-            for word in self.emotional_words.union(self.bias_words):
-                if word in sentence.lower():
-                    neutral = re.sub(rf'\b{word}\b', '', neutral, flags=re.IGNORECASE)
+            words = sentence.split()
+            filtered_words = []
+            for word in words:
+                clean_word = re.sub(r'[^\w]', '', word.lower())
+                if clean_word not in self.emotional_words and clean_word not in self.bias_words:
+                    filtered_words.append(word)
+            neutral = ' '.join(filtered_words)
+            if not neutral.strip():
+                neutral = sentence
         
         return {
             'original': original,
-            'stronger': stronger,
+            'stronger': stronger if stronger != original else "Already strong enough",
             'evidence_based': evidence_based,
-            'neutral': neutral
+            'neutral': neutral if neutral != original else "Already neutral"
         }
     
     def analyze_sentence(self, sentence, prev_role=None):
@@ -406,39 +435,29 @@ class AdvancedArgumentAnalyzer:
         category, emoji = self.get_category(score)
         fallacies = self.detect_fallacy(sentence)
         argument_role = self.determine_argument_role(sentence, prev_role)
-        readability = self.get_readability_metrics(sentence)
+        readability_score = self.get_sentence_readability(sentence)
         
         return {
             'sentence': sentence,
-            'score': score,
+            'score': round(score, 1),
             'category': category,
             'category_emoji': emoji,
-            'confidence': score / 100,
+            'confidence': round(score / 100, 2),
             'detected_features': features,
             'fallacies': fallacies,
             'argument_role': argument_role,
-            'readability': readability['flesch_score'],
-            'readability_level': self.get_readability_level(readability['flesch_score'])
+            'readability': round(readability_score, 1),
+            'readability_level': self.get_readability_level(readability_score)
         }
     
     def generate_debate_arguments(self, text):
         """Generate supporting and counter arguments"""
-        # Supporting argument
-        support = f"Supporting this position, we can observe that {text[:100].lower()}..." 
-        support += " This is further reinforced by logical reasoning and available evidence."
-        
-        # Counter argument
-        counter = f"However, an alternative perspective suggests that {text[:100].lower()}..." 
-        counter += " This viewpoint challenges the initial assumption by considering different factors."
-        
-        # Neutral summary
-        neutral = f"From an academic standpoint, the argument presents several key points. " 
-        neutral += "While the core premise has merit, it requires additional evidence and consideration of counterarguments."
+        preview = text[:100].strip()
         
         return {
-            'supporting': support,
-            'counter': counter,
-            'neutral': neutral
+            'supporting': f"Supporting this position, {preview.lower()}... This is reinforced by logical reasoning and empirical evidence.",
+            'counter': f"However, an alternative perspective suggests that {preview.lower()}... This challenges the initial assumption.",
+            'neutral': f"From an academic standpoint, the argument presents key points that require further evidence and consideration."
         }
 
 # ---------------------------
@@ -476,21 +495,22 @@ def display_badge(text, category):
     """, unsafe_allow_html=True)
 
 def highlight_text(sentence, analyzer):
-    """Highlight words in sentence based on type"""
+    """Improved word highlighting with regex cleaning"""
     words = sentence.split()
     highlighted = []
     
     for word in words:
-        word_lower = word.lower().strip('.,!?;:')
-        if word_lower in analyzer.evidence_words:
+        clean_word = re.sub(r'[^\w]', '', word.lower())
+        
+        if clean_word in analyzer.evidence_words:
             highlighted.append(f'<span class="highlight-evidence">{word}</span>')
-        elif word_lower in analyzer.logic_words:
+        elif clean_word in analyzer.logic_words:
             highlighted.append(f'<span class="highlight-logic">{word}</span>')
-        elif word_lower in analyzer.bias_words:
+        elif clean_word in analyzer.bias_words:
             highlighted.append(f'<span class="highlight-bias">{word}</span>')
-        elif word_lower in analyzer.weak_words:
+        elif clean_word in analyzer.weak_words:
             highlighted.append(f'<span class="highlight-weak">{word}</span>')
-        elif word_lower in analyzer.emotional_words:
+        elif clean_word in analyzer.emotional_words:
             highlighted.append(f'<span class="highlight-emotional">{word}</span>')
         else:
             highlighted.append(word)
@@ -518,33 +538,15 @@ def main():
         user_input = st.text_area(
             "Enter your argument or debate text:",
             height=200,
-            placeholder="Paste your argument here... The system will analyze each sentence for strength, fallacies, and structure."
+            placeholder="Paste your argument here... The system will analyze each sentence for strength, fallacies, and structure.",
+            key="input_text"
         )
         
         analyze_btn = st.button("🔍 Analyze Argument", use_container_width=True)
     
     if analyze_btn and user_input:
         with st.spinner("Analyzing argument with advanced AI..."):
-            # Language detection and translation
-            lang = analyzer.detect_language(user_input)
-            is_hindi = lang == 'hi'
-            
-            if is_hindi:
-                st.info("🌐 Hindi text detected. Translating to English for analysis...")
-                english_text = analyzer.translate_to_english(user_input)
-                
-                # Display original and translated
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown("**Original Hindi:**")
-                    st.markdown(f"<div style='background-color: #1E293B; padding: 15px; border-radius: 10px;'>{user_input}</div>", unsafe_allow_html=True)
-                with col2:
-                    st.markdown("**English Translation:**")
-                    st.markdown(f"<div style='background-color: #1E293B; padding: 15px; border-radius: 10px;'>{english_text}</div>", unsafe_allow_html=True)
-                
-                text_to_analyze = english_text
-            else:
-                text_to_analyze = user_input
+            text_to_analyze = user_input
             
             # Tokenize sentences
             sentences = sent_tokenize(text_to_analyze)
@@ -564,8 +566,11 @@ def main():
             overall_score = df['score'].mean()
             overall_category, overall_emoji = analyzer.get_category(overall_score)
             
-            # Readability metrics for full text
-            readability_metrics = analyzer.get_readability_metrics(text_to_analyze)
+            # Readability metrics for full text (cached)
+            readability_metrics = analyzer.get_readability_metrics_cached(text_to_analyze)
+            readability_metrics['complex_percentage'] = (
+                readability_metrics['complex_words'] / max(textstat.lexicon_count(text_to_analyze, True), 1) * 100
+            )
             
             # Tabs for different views
             tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
@@ -585,7 +590,8 @@ def main():
                     display_metric_card("Overall Score", f"{overall_score:.1f}/100", f"{overall_category} {overall_emoji}", color)
                 
                 with col2:
-                    display_metric_card("Total Sentences", len(sentences), f"Avg Length: {df['detected_features'].apply(lambda x: x['word_count']).mean():.0f} words")
+                    avg_length = df['detected_features'].apply(lambda x: x['word_count']).mean()
+                    display_metric_card("Total Sentences", len(sentences), f"Avg Length: {avg_length:.0f} words")
                 
                 with col3:
                     strong_count = len(df[df['category'] == 'Strong'])
@@ -602,7 +608,6 @@ def main():
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    # Bar chart of sentence scores
                     fig = px.bar(
                         x=[f"S{i+1}" for i in range(len(df))],
                         y=df['score'],
@@ -625,7 +630,6 @@ def main():
                     st.plotly_chart(fig, use_container_width=True)
                 
                 with col2:
-                    # Pie chart of categories
                     category_counts = df['category'].value_counts()
                     fig = px.pie(
                         values=category_counts.values,
@@ -645,15 +649,14 @@ def main():
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 
-                # Radar chart
+                # Radar chart with bounded values
                 st.markdown("### Multidimensional Analysis")
                 
-                # Calculate dimensions
-                logic_score = df['detected_features'].apply(lambda x: x['logic_count']).mean() * 20
-                evidence_score = df['detected_features'].apply(lambda x: x['evidence_count']).mean() * 25
-                bias_score = 100 - (df['detected_features'].apply(lambda x: x['bias_count']).mean() * 30)
-                clarity_score = df['readability_level'].apply(lambda x: 90 if x == 'Easy' else 60 if x == 'Moderate' else 30).mean()
-                emotional_score = 100 - (df['detected_features'].apply(lambda x: x['emotional_count']).mean() * 25)
+                logic_score = min(100, df['detected_features'].apply(lambda x: x['logic_count']).mean() * 25)
+                evidence_score = min(100, df['detected_features'].apply(lambda x: x['evidence_count']).mean() * 25)
+                bias_score = min(100, max(0, 100 - (df['detected_features'].apply(lambda x: x['bias_count']).mean() * 30)))
+                clarity_score = min(100, df['readability_level'].apply(lambda x: 90 if x == 'Easy' else 60 if x == 'Moderate' else 30).mean())
+                emotional_score = min(100, max(0, 100 - (df['detected_features'].apply(lambda x: x['emotional_count']).mean() * 30)))
                 
                 fig = go.Figure(data=go.Scatterpolar(
                     r=[logic_score, evidence_score, bias_score, clarity_score, emotional_score],
@@ -666,11 +669,7 @@ def main():
                 fig.update_layout(
                     polar=dict(
                         bgcolor='#1E293B',
-                        radialaxis=dict(
-                            visible=True,
-                            range=[0, 100],
-                            color='#CBD5E1'
-                        )
+                        radialaxis=dict(visible=True, range=[0, 100], color='#CBD5E1')
                     ),
                     showlegend=False,
                     paper_bgcolor='#1E293B',
@@ -688,11 +687,9 @@ def main():
                     with st.container():
                         st.markdown(f"#### Sentence {idx + 1}")
                         
-                        # Highlighted text
                         highlighted = highlight_text(row['sentence'], analyzer)
                         st.markdown(f"<div style='background-color: #111827; padding: 15px; border-radius: 10px; margin-bottom: 10px;'>{highlighted}</div>", unsafe_allow_html=True)
                         
-                        # Metrics
                         col1, col2, col3, col4 = st.columns(4)
                         
                         with col1:
@@ -707,7 +704,6 @@ def main():
                         with col4:
                             display_badge(f"Confidence: {row['confidence']*100:.0f}%", 'Moderate')
                         
-                        # Features
                         features = row['detected_features']
                         st.markdown("**Detected Features:**")
                         feature_cols = st.columns(5)
@@ -723,7 +719,6 @@ def main():
                         with feature_cols[4]:
                             st.markdown(f"😊 Emotional: {'⚠️' if features['emotional_present'] else '✅'} ({features['emotional_count']})")
                         
-                        # Rewrite suggestions for weak sentences
                         if row['score'] < 70:
                             with st.expander("💡 AI Rewrite Suggestions"):
                                 rewrites = analyzer.generate_rewrite(row['sentence'], features)
@@ -732,14 +727,12 @@ def main():
                                 with col1:
                                     st.markdown("**Original:**")
                                     st.markdown(f"<div style='background-color: #1E293B; padding: 10px; border-radius: 5px;'>{rewrites['original']}</div>", unsafe_allow_html=True)
-                                    
                                     st.markdown("**Stronger Version:**")
                                     st.markdown(f"<div style='background-color: #1E293B; padding: 10px; border-radius: 5px; border-left: 3px solid #22C55E;'>{rewrites['stronger']}</div>", unsafe_allow_html=True)
                                 
                                 with col2:
                                     st.markdown("**Evidence-Based:**")
                                     st.markdown(f"<div style='background-color: #1E293B; padding: 10px; border-radius: 5px; border-left: 3px solid #3B82F6;'>{rewrites['evidence_based']}</div>", unsafe_allow_html=True)
-                                    
                                     st.markdown("**Neutral Version:**")
                                     st.markdown(f"<div style='background-color: #1E293B; padding: 10px; border-radius: 5px; border-left: 3px solid #F59E0B;'>{rewrites['neutral']}</div>", unsafe_allow_html=True)
                         
@@ -759,16 +752,14 @@ def main():
                     for i, row in df.iterrows()
                 ])
                 
-                # Color rows based on fallacy presence
                 def color_fallacies(val):
                     if val != 'None':
                         return 'background-color: #EF4444; color: white'
                     return ''
                 
-                styled_df = fallacy_df.style.applymap(color_fallacies, subset=['Fallacies'])
+                styled_df = fallacy_df.style.map(color_fallacies, subset=['Fallacies'])
                 st.dataframe(styled_df, use_container_width=True)
                 
-                # Fallacy statistics
                 fallacy_counts = Counter()
                 for fallacies in df['fallacies']:
                     if fallacies != ["None Detected"]:
@@ -794,7 +785,6 @@ def main():
             with tab4:
                 st.markdown("### Argument Structure Analysis")
                 
-                # Role distribution
                 role_counts = df['argument_role'].value_counts()
                 
                 col1, col2 = st.columns(2)
@@ -814,7 +804,6 @@ def main():
                     st.plotly_chart(fig, use_container_width=True)
                 
                 with col2:
-                    # Flow diagram
                     st.markdown("### Argument Flow")
                     flow_data = []
                     for i, row in df.iterrows():
@@ -841,9 +830,7 @@ def main():
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 
-                # Structure quality metrics
                 st.markdown("### Structure Quality")
-                
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
@@ -862,7 +849,6 @@ def main():
             with tab5:
                 st.markdown("### Readability Analysis")
                 
-                # Main metrics
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
@@ -888,7 +874,6 @@ def main():
                         f"{readability_metrics['complex_percentage']:.1f}% of text"
                     )
                 
-                # Sentence-level readability
                 st.markdown("### Sentence Readability Breakdown")
                 
                 readability_df = pd.DataFrame([
@@ -919,9 +904,6 @@ def main():
                     font_color='#F8FAFC'
                 )
                 st.plotly_chart(fig, use_container_width=True)
-                
-                # Recommendations
-                st.markdown("### Readability Recommendations")
                 
                 if readability_metrics['flesch_score'] < 30:
                     st.warning("⚠️ Text is complex. Consider simplifying sentence structure and using shorter words.")
@@ -973,24 +955,6 @@ def main():
                     - **Avoid emotional language** in academic debate
                     - **Consider multiple perspectives** for balanced argument
                     """)
-            
-            # Export options
-            st.markdown("---")
-            col1, col2, col3 = st.columns([1, 1, 1])
-            with col2:
-                # Prepare export data
-                export_df = df[['sentence', 'score', 'category', 'argument_role']].copy()
-                export_df['fallacies'] = df['fallacies'].apply(lambda x: ', '.join(x) if x != ["None Detected"] else "None")
-                export_df['readability_score'] = df['readability']
-                
-                csv = export_df.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download Analysis Report (CSV)",
-                    data=csv,
-                    file_name="argument_analysis_report.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
     
     # Footer
     st.markdown("---")
