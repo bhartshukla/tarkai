@@ -35,89 +35,89 @@ Special mode designed for law students and legal professionals:
 
 IRAC structure detection:
 
-Issue
+Issue -
 
-Rule
+Rule-
 
-Application
+Application-
 
-Conclusion
+Conclusion-
 
-Legal quality scoring
+Legal quality scoring-
 
-Formality analysis
+Formality analysis-
 
-Citation suggestions
+Citation suggestions-
 
-Legal writing improvement tips
+Legal writing improvement tips-
 
 # Toxicity & Ethics Analyzer
 
-Detects toxic language
+Detects toxic language-
 
-Identifies insults and aggression
+Identifies insults and aggression-
 
-Highlights abusive words
+Highlights abusive words-
 
-Provides ethical writing suggestions
+Provides ethical writing suggestions-
 
-Academic tone recommendations
+Academic tone recommendations-
 
 # Logical Fallacy Detection
 
 Detects common fallacies:
 
-Ad Hominem
+Ad Hominem-
+-
+Hasty Generalization-
 
-Hasty Generalization
+False Dilemma-
 
-False Dilemma
+Slippery Slope-
 
-Slippery Slope
+Appeal to Emotion-
 
-Appeal to Emotion
-
-Circular Reasoning
+Circular Reasoning-
 
 # Readability & Academic Quality Analysis
 
 Provides:
 
-Flesch Reading Ease Score
+Flesch Reading Ease Score-
 
-Grade level estimation
+Grade level estimation-
 
-Complex word percentage
+Complex word percentage-
 
-Sentence clarity analysis
+Sentence clarity analysis-
 
-Academic readability evaluation
+Academic readability evaluation-
 
 # Coherence & Research Quality
 
-Logical flow analysis
+Logical flow analysis-
 
-Transition word detection
+Transition word detection-
 
-Evidence gap detection
+Evidence gap detection-
 
-Research enhancement suggestions
+Research enhancement suggestions-
 
-Argument coherence scoring
+Argument coherence scoring-
 
 # Visual Analytics Dashboard
 
 Interactive charts using Plotly:
 
-Sentence strength graph
+Sentence strength graph-
 
-Argument distribution pie chart
+Argument distribution pie chart-
 
-Radar chart analysis
+Radar chart analysis-
 
-Fallacy distribution graph
+Fallacy distribution graph-
 
-Readability graph
+Readability graph-
 
 # System Architecture
 tarkAI Analyzer Pro
