@@ -7,27 +7,27 @@ Built with Streamlit, spaCy, NLTK, Plotly, and NLP intelligence, this system hel
 
 
 # Key Features
-🧠 Core Argument Intelligence ------
+🧠 Core Argument Intelligence ------ --
 
 Sentence-level argument strength scoring (0–100)
 
-Evidence detection.
+Evidence detection. -
 
-Logic quality detection.
+Logic quality detection. -
 
-Bias detection
+Bias detection - 
 
-Emotional language detection
+Emotional language detection -
 
 Argument role classification:
 
-Claim
+Claim -
 
-Evidence
+Evidence -
 
-Counterargument
+Counterargument -
 
-Conclusion
+Conclusion -
 
 # Legal Academic Mode (IRAC Analysis)
 
