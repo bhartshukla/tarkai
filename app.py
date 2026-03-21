@@ -951,18 +951,18 @@ def main():
                         st.markdown("**Detected Features:**")
                         feature_cols = st.columns(5)
                         with feature_cols[0]:
-                            st.markdown(f"📊 Evidence: {'✅' if features['evidence_present'] else '❌'} ({features['evidence_count']})")
+                            st.markdown(f" Evidence: {'✅' if features['evidence_present'] else '❌'} ({features['evidence_count']})")
                         with feature_cols[1]:
-                            st.markdown(f"🔢 Statistics: {'✅' if features['statistics_present'] else '❌'}")
+                            st.markdown(f" Statistics: {'✅' if features['statistics_present'] else '❌'}")
                         with feature_cols[2]:
-                            st.markdown(f"🧠 Logic: {'✅' if features['logic_present'] else '❌'} ({features['logic_count']})")
+                            st.markdown(f" Logic: {'✅' if features['logic_present'] else '❌'} ({features['logic_count']})")
                         with feature_cols[3]:
-                            st.markdown(f"⚖️ Bias: {'⚠️' if features['bias_present'] else '✅'} ({features['bias_count']})")
+                            st.markdown(f" Bias: {'⚠️' if features['bias_present'] else '✅'} ({features['bias_count']})")
                         with feature_cols[4]:
-                            st.markdown(f"😊 Emotional: {'⚠️' if features['emotional_present'] else '✅'} ({features['emotional_count']})")
+                            st.markdown(f" Emotional: {'⚠️' if features['emotional_present'] else '✅'} ({features['emotional_count']})")
                         
                         if row['score'] < 70:
-                            with st.expander("💡 AI Rewrite Suggestions"):
+                            with st.expander(" AI Rewrite Suggestions"):
                                 rewrites = core.generate_rewrite(row['sentence'], features)
                                 col1, col2 = st.columns(2)
                                 with col1:
@@ -1046,9 +1046,9 @@ def main():
                         st.markdown("#### Structure Completeness")
                         missing = results['legal']['missing']
                         if missing:
-                            st.warning(f"⚠️ Missing IRAC components: {', '.join(missing).title()}")
+                            st.warning(f" Missing IRAC components: {', '.join(missing).title()}")
                         else:
-                            st.success("✅ Complete IRAC structure detected!")
+                            st.success(" Complete IRAC structure detected!")
                         
                         # Formality and legal quality
                         col1, col2 = st.columns(2)
@@ -1076,7 +1076,7 @@ def main():
                         st.markdown("#### Citation Suggestions")
                         if results['legal']['citations']:
                             for cit in results['legal']['citations']:
-                                st.info(f"📚 {cit['suggestion']}\n\n> {cit['sentence'][:200]}...")
+                                st.info(f" {cit['suggestion']}\n\n> {cit['sentence'][:200]}...")
                         else:
                             st.success("No citation suggestions needed")
             else:
@@ -1240,7 +1240,7 @@ def main():
                     """, unsafe_allow_html=True)
                     
                     if toxicity['suggestion']:
-                        st.info(f"💡 {toxicity['suggestion']}")
+                        st.info(f" {toxicity['suggestion']}")
                 
                 with col2:
                     # Highlighted text
@@ -1308,21 +1308,21 @@ def main():
                     st.markdown("#### Research Enhancement Suggestions")
                     if results['legal']['citations']:
                         for cit in results['legal']['citations']:
-                            st.info(f"📚 {cit['suggestion']}\n\n> {cit['sentence'][:150]}...")
+                            st.info(f" {cit['suggestion']}\n\n> {cit['sentence'][:150]}...")
                     else:
-                        st.success("✅ Claims appear well-supported")
+                        st.success(" Claims appear well-supported")
                     
                     # Evidence gaps
                     evidence_gaps = df[~df['detected_features'].apply(lambda x: x['evidence_present'])]
                     if not evidence_gaps.empty:
-                        st.warning(f"⚠️ {len(evidence_gaps)} sentences lack evidentiary support")
+                        st.warning(f" {len(evidence_gaps)} sentences lack evidentiary support")
                         for _, row in evidence_gaps.iterrows():
                             st.markdown(f"- {row['sentence'][:100]}...")
                     
                     # Bias check
                     bias_present = df[df['detected_features'].apply(lambda x: x['bias_present'])]
                     if not bias_present.empty:
-                        st.warning(f"⚠️ {len(bias_present)} sentences contain absolute language")
+                        st.warning(f" {len(bias_present)} sentences contain absolute language")
                 else:
                     st.markdown("#### Enable Academic Legal Mode for coherence analysis")
                     st.info("🎓 Toggle Academic Legal Mode in sidebar for detailed coherence metrics, IRAC structure, and research suggestions")
@@ -1332,7 +1332,7 @@ def main():
     footer_color = '#111111' if st.session_state.academic_mode else '#CBD5E1'
     st.markdown(f"""
     <div style="text-align: center; color: {footer_color}; padding: 20px;">
-        <p>⚖️ Argument Strength Analyzer Pro | Legal Academic Intelligence System</p>
+        <p> Argument Strength Analyzer Pro | Legal Academic Intelligence System</p>
         <p style="font-size: 12px;">Built with Streamlit, spaCy, NLTK, and Plotly</p>
     </div>
     """, unsafe_allow_html=True)
