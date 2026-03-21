@@ -496,13 +496,13 @@ class CoreAnalyzer:
     
     def get_category(self, score):
         if score >= 86:
-            return "Research-Level", "🔬"
+            return "Research-Level", 
         elif score >= 71:
-            return "Strong", "💪"
+            return "Strong", 
         elif score >= 41:
-            return "Moderate", "📊"
+            return "Moderate", 
         else:
-            return "Weak", "⚠️"
+            return "Weak",
     
     def detect_fallacy(self, sentence):
         sentence_lower = sentence.lower()
@@ -712,7 +712,7 @@ def main():
     
     # Sidebar for mode toggle
     with st.sidebar:
-        st.markdown("## ⚖️ System Mode")
+        st.markdown("System Mode")
         academic_mode = st.toggle(
             "🎓 Academic Legal Mode",
             value=st.session_state.academic_mode,
@@ -738,7 +738,7 @@ def main():
     st.markdown(get_theme_css(st.session_state.academic_mode), unsafe_allow_html=True)
     
     # Header
-    title = "⚖️ Argument Strength Analyzer Pro" if st.session_state.academic_mode else "🎯 Argument Strength Analyzer Pro"
+    title = " Argument Strength Analyzer Pro" if st.session_state.academic_mode else " Argument Strength Analyzer Pro"
     subtitle = "Legal Academic Intelligence System" if st.session_state.academic_mode else "Research-Grade Debate Intelligence System"
     
     st.markdown(f"""
@@ -761,7 +761,7 @@ def main():
             key="input_text"
         )
         
-        analyze_btn = st.button("🔍 Analyze Argument", use_container_width=True)
+        analyze_btn = st.button(" Analyze Argument", use_container_width=True)
     
     if analyze_btn and user_input.strip():
         with st.spinner("Analyzing argument with advanced AI..."):
@@ -778,12 +778,12 @@ def main():
             toxicity_analyzer = results['toxicity_analyzer']
             
             # Build tabs based on mode
-            tabs = ["📊 Overview", "📝 Sentence Analysis", "⚠️ Fallacy Report"]
+            tabs = [" Overview", " Sentence Analysis", " Fallacy Report"]
             if st.session_state.academic_mode:
-                tabs.extend(["🏛️ IRAC & Legal", "📚 Readability & Formality"])
+                tabs.extend([" IRAC & Legal", " Readability & Formality"])
             else:
-                tabs.extend(["🏗️ Structure Analysis", "📖 Readability"])
-            tabs.extend(["🚨 Toxicity & Ethics", "🧠 Coherence & Research"])
+                tabs.extend([" Structure Analysis", " Readability"])
+            tabs.extend(["🚨 Toxicity & Ethics", " Coherence & Research"])
             
             tab_objects = st.tabs(tabs)
             
